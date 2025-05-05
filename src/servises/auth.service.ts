@@ -1,144 +1,133 @@
 import { Request, Response } from "express";
-import { connectToPostDb } from "../db/db.pgadmin";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { userService } from "./user.services";
-
+import { ApiRegister } from "../types/apiRegister";
+import { TAdminLoginData, TAdminRegisterData } from "../types/auth/auth.types";
+import trh from "../db/trh";
+import { error } from "console";
+interface DecodedToken extends jwt.JwtPayload {
+  user_id: number; // або string, залежно від того, який тип у вас є
+}
+let connection;
 class AuthService {
-  async login(email:string,password:string) {
-    const connection = await connectToPostDb();
-console.log('procec jwt access',process.env.JWT_ACCESS_SECRET);
-console.log('procec jwt refresh',process.env.JWT_REFRESH_SECRET);
-
+  async login(data: TAdminLoginData) {
     try {
-      const result = await connection.query(
-        "SELECT * FROM users WHERE email = $1",
-        [email]
-      );
-      const user = result.rows[0];
+      const loginObject = {
+        email: data.email,
+      };
+
+      const first = await trh.query(`call adm_user_login($1,$2)`, [
+        loginObject,
+        {},
+      ]);
+
+      const firstCheck = first.rows[0].rs;
+      console.log(firstCheck);
+      if (firstCheck.status === "error") {
+        return {
+          firstCheck: {
+            error_message: firstCheck.error_message,
+          },
+        };
+      }
+      if (firstCheck.data.password_hash) {
+        const comparePassword = await bcrypt.compare(
+          data.password,
+          firstCheck.data.password_hash
+        );
+
+        if (comparePassword) {
+          const now = new Date();
+          const sevenDaysLater = new Date(
+            now.getTime() + 7 * 24 * 60 * 60 * 1000
+          );
+          const accessToken = jwt.sign(
+            { user_id: firstCheck.data.id },
+            `${process.env.JWT_ACCESS_SECRET!}`,
+            { expiresIn: "15m" }
+          );
+
+          // Генерація refresh токену
+          const refreshToken = jwt.sign(
+            { user_id: firstCheck.data.id },
+            `${process.env.JWT_REFRESH_SECRET!}`,
+            { expiresIn: "7d" }
+          );
+
+          const tokenSave = await trh.query(`call adm_user_token($1,$2)`, [
+            {
+              id_admuser: firstCheck.data.id,
+              refresh_token: refreshToken,
+              dt_lifetime: sevenDaysLater,
+            },
+            {},
+          ]);
+
+          console.log(tokenSave.rows[0]);
+
+          return {
+            firstCheck,
+            refreshToken,
+            accessToken,
+          };
+        }
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  async refreshSecretToken(refreshToken: string) {
+    try {
+      const decoded = jwt.verify(
+        refreshToken,
+        process.env.JWT_REFRESH_SECRET!
+      ) as DecodedToken;
+
+      const userData = await userService.getUserById(decoded?.user_id);
+      const user = userData.rows[0];
       console.log(user);
 
       if (!user) {
-        return {msg:'user not found'}
-      }
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-      if (!isPasswordValid) {
-        return {msg:'not valid password'}
-      }
-      const accessToken =  jwt.sign(
-        { id: user.id, name: user.name, email: user.email, role: user.role },
-        process.env.JWT_ACCESS_SECRET!,
-        { expiresIn: "1h" }
-      );
-      const refreshToken =  jwt.sign(
-        { id: user.id, name: user.name, email: user.email, role: user.role },
-        process.env.JWT_REFRESH_SECRET!,
-        { expiresIn: "6h" }
-      );
-
-
-      return { user, accessToken,refreshToken };
-    } catch (error) {
-      console.error("Помилка при логіні:", error);
-
-    }
-  }
-
-  async logout(req: Request, res: Response) {
-    try {
-      res.clearCookie("refreshToken");
-      res.clearCookie("accessToken");
-      console.log("TEST SERVER - Користувач вийшов");
-      res.status(200).json({ message: "Ви успішно вийшли" });
-    } catch (error) {
-      console.log(error);
-      res.status(500).json({ message: "Помилка при виході" });
-    }
-  }
-
-  async refreshSecretToken(refreshToken:string) {
-
-   
-console.log(refreshToken,'refresh token in service');
-    
-    // if (!refreshToken) {
-    //   return { message: "Refresh token відсутній" }
-    // }
-    try {
-  
-      
-      const decoded:any = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!);
-      console.log('DECODEDF',decoded);
- 
-      const userData = await userService.getUserById(decoded?.id);
-      const user = userData.rows[0]
-    
-      
-
-      if (!user) {
-        return { message: "Користувача не знайдено" }
+        return { message: "Користувача не знайдено" };
       }
       const newAccessToken = jwt.sign(
-        { id: user.id, role: user.role },
+        { user_id: user.id },
         process.env.JWT_ACCESS_SECRET!,
-        { expiresIn: "10s" }
+        { expiresIn: "20m" }
       );
       const newRefreshToken = jwt.sign(
-        { id: user.id, role: user.role },
+        { user_id: user.id },
         process.env.JWT_REFRESH_SECRET!,
         { expiresIn: "10d" }
       );
 
-
       return {
-       newAccessToken,user,newRefreshToken
-      }
+        newAccessToken,
+        user,
+        newRefreshToken,
+      };
     } catch (error) {
-      return { message: "Недійсний refresh token" }
+      return { message: "Недійсний refresh token" };
     }
   }
-  // async getMe(req: Request, res: Response) {
-  //   const connection = await connectToPostDb();
-  //   const { email, password } = req.body;
-  //   console.log(req.body);
 
-  //   const JWT_SECRET = process.env.JWT_SECRET;
-  //   if (!JWT_SECRET) {
-  //     throw new Error("JWT_SECRET не визначено");
-  //   }
-
-  //   try {
-  //     const result = await connection.query(
-  //       "SELECT * FROM users WHERE email = $1",
-  //       [email]
-  //     );
-  //     const user = result.rows[0];
-  //     console.log(user);
-
-  //     if (!user) {
-  //       res.status(404).json("Користувача не знайдено");
-  //     }
-  //     const isPasswordValid = await bcrypt.compare(password, user.password);
-  //     if (!isPasswordValid) {
-  //       res.status(404).json("Помилка авторизації");
-  //     }
-  //     const token = await jwt.sign(
-  //       { id: user.id, name: user.name, email: user.email, role: user.role },
-  //       JWT_SECRET,
-  //       { expiresIn: "6h" }
-  //     );
-  //     res.cookie("token", token, {
-  //       httpOnly: true,
-  //       secure: process.env.NODE_ENV === "production", // Для безпеки тільки на HTTPS
-  //       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 днів
-  //       sameSite: "lax", // Може бути 'None', якщо міждоменний запит
-  //     });
-  //     return res.status(200).json({ user, token });
-  //   } catch (error) {
-  //     console.error("Помилка при логіні:", error);
-  //     return res.status(500).json({ message: "Помилка сервера" });
-  //   }
-  // }
+  async postRegisterUser(data: TAdminRegisterData) {
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const registerObject = {
+      password_hash: hashedPassword,
+      name: data?.name,
+      surname: data?.surname,
+      email: data?.email,
+    };
+    const result = await trh.query("call adm_user_reestr($1,$2)", [
+      registerObject,
+      {},
+    ]);
+    console.log(result.rows[0], "result for register");
+    return result.rows[0];
+  }
 }
 
 export const authService = new AuthService();

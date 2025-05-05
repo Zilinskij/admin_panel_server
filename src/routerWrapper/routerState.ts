@@ -4,7 +4,7 @@ import authRoutes from "../routes/auth.route";
 
 const serverRoutes = [
   { path: "/users", name: userRoutes },
-  { path: "/company", name: companyRoutes },
+  { path: "/companyes", name: companyRoutes },
   { path: "/auth", name: authRoutes },
 ];
 

@@ -1,8 +1,8 @@
 import dotenv from "dotenv";
 dotenv.config();
 import { ApiRegister } from "../types/apiRegister";
-import bcrypt from "bcryptjs";
 import { connectToPostDb } from "../db/db.pgadmin";
+import trh from "../db/trh";
 
 let connection;
 
@@ -12,9 +12,10 @@ let connection;
 // }
 class UserService {
   async getAllUsers() {
-    connection = await connectToPostDb();
     try {
-      const result = await connection.query("SELECT * FROM users");
+      const result = await trh.query("SELECT * FROM usr");
+      console.log(result);
+      
       return result;
     } catch (err) {
       throw new Error("Error fetching users");
@@ -22,10 +23,9 @@ class UserService {
   }
 
   async getUserById(id: any) {
-    connection = await connectToPostDb();
     try {
-      const result = await connection.query(
-        `SELECT * FROM users where id = ${id}`
+      const result = await trh.query(
+        `SELECT * FROM admusr where id = $1`,[id]
       );
       return result;
     } catch (err) {
@@ -33,33 +33,6 @@ class UserService {
     }
   }
 
-  async postRegisterUser({ name, email, password }: ApiRegister) {
-    connection = await connectToPostDb();
-    const saltRounds = 10;
-    const hash = await bcrypt.hash(password, saltRounds);
-    console.log(password);
-    console.log(hash);
-
-    try {
-      const result = await connection.query(
-        "INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4)",
-        [name, email, hash, "user"]
-      );
-
-      // Повернення новоствореного користувача Return new user
-      if (result) {
-        const rows = await connection.query(
-          "SELECT name, email FROM users WHERE id = $1",
-          [result.insertId]
-        );
-        return rows;
-      }
-      return result.json();
-    } catch (error: any) {
-      console.error("Register user error:", error);
-      throw new Error("Error register users");
-    } 
-  }
 
   async deleteUserById(id: any) {
     connection = await connectToPostDb();
@@ -70,8 +43,6 @@ class UserService {
       return result;
     } catch (error) {
       throw new Error("Error delete user");
-    } finally {
-      connection.end();
     }
   }
 

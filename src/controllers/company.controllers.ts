@@ -3,7 +3,9 @@ import { companyService } from "../servises/company.services";
 
 class CompanyController {
   async getCompany(req: Request, res: Response, next: NextFunction) {
-    const company = await companyService.getAllCompanies();
+    const limit = parseInt(req.query.limit as string, 20);
+    const page = parseInt(req.query.page as string, 10);
+    const company = await companyService.getAllCompanies(limit, page);
     // console.log("Company controller getCompany:", company);
     res.json(company);
   }
@@ -30,8 +32,11 @@ class CompanyController {
     res.json(company);
   }
   async updateCompanyById(req: Request, res: Response, next: NextFunction) {
-    const { id }: any = req.params;
-    const updateCompany = await companyService.updateCompany({...req.body, id});
+    const { kod }: any = req.params;
+    const updateCompany = await companyService.updateCompany({
+      ...req.body,
+      kod,
+    });
     res.json(updateCompany);
   }
 }

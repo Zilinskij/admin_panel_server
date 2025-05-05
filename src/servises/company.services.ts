@@ -1,15 +1,38 @@
 import { connectToPostDb } from "../db/db.pgadmin";
+import trh from "../db/trh";
+import { ClientsIst } from "../types/clients/IST.client";
 import { ApiEntry } from "../types/entry";
 
 let connection;
 
 class CompanyService {
-  async getAllCompanies() {
-    connection = await connectToPostDb();
+  async getAllCompanies(limit: number, page: number) {
     try {
-      const result = await connection.query("SELECT * from danikompanij ORDER BY id");
-      return result.rows;
+      const offset = (page - 1) * limit;
+      const result = await trh.query(
+        "select kod, NURDOKL, NURDOKLFIX, NUR, ADRPUNKT, ADRVUL, ISCLIENT, ISPOSTACH, PERMN, PERNEGABARIT, DIRECTOR from ur order by kod limit $1 offset $2",
+        [limit, offset]
+      );
+      const countResults = await trh.query("SELECT count(*) from ur");
+      const totalResults = parseInt(countResults.rows[0].count, 10);
+      const totalPages = Math.ceil(totalResults / limit);
+
+      console.log("Кількість записів: ", totalResults);
+      console.log("Кількість сторінок ", totalPages);
+      console.log("Page -  ", page);
+
+      return {
+        data: result.rows,
+        pagination: {
+          totalResults,
+          totalPages,
+          currentPage: page,
+          pageSize: limit,
+        },
+      };
     } catch (error) {
+      console.error("DB error: ", error);
+
       throw new Error("Error fetching data company");
     }
   }
@@ -27,38 +50,45 @@ class CompanyService {
   }
 
   async updateCompany({
-    id,
-    imjakompanii,
-    kodkompanii,
-    dyrector,
-    stvorena,
-    nomertel,
-    adresa,
-    kilkprac,
-    kilkprychepiv,
-    kilkavto,
-    strahfirm,
-  }: ApiEntry) {
-    connection = await connectToPostDb();
+    kod,
+    nurdokl,
+    nurdoklfix,
+    nur,
+    adrpunkt,
+    adrvul,
+    director,
+    isclient,
+    ispostach,
+    iselse,
+    isexp,
+    permn,
+    pernegabarit,
+  }: ClientsIst) {
     try {
-      const result = await connection.query(
-        "UPDATE danikompanij SET  imjakompanii = $1, kodkompanii = $2, dyrector = $3,stvorena = $4, nomertel = $5, adresa = $6, kilkprac = $7, kilkprychepiv = $8, kilkavto = $9, strahfirm = $10 WHERE id = $11",
+      const result = await trh.query(
+        "UPDATE ur SET nurdokl = $2, nurdoklfix = $3, nur = $4, adrpunkt = $5, adrvul = $6, director = $7, isclient = $8, ispostach = $9, iselse = $10, isexp = $11, permn = $12, pernegabarit = $13 WHERE kod = $1",
         [
-          imjakompanii,
-          kodkompanii,
-          dyrector,
-          stvorena,
-          nomertel,
-          adresa,
-          kilkprac,
-          kilkprychepiv,
-          kilkavto,
-          strahfirm,
-          id,
+          kod,
+          nurdokl,
+          nurdoklfix,
+          nur,
+          adrpunkt,
+          adrvul,
+          director,
+          isclient,
+          ispostach,
+          iselse,
+          isexp,
+          permn,
+          pernegabarit,
         ]
       );
+      console.log(result);
+      
       return result;
     } catch (error) {
+      console.error(error, 'in services');
+      
       throw new Error("Error update user");
     }
   }
