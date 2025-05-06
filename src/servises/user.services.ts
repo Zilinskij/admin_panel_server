@@ -13,7 +13,7 @@ let connection;
 class UserService {
   async getAllUsers() {
     try {
-      const result = await trh.query("SELECT * FROM usr");
+      const result = await trh.query("SELECT * FROM admusr");
       console.log(result);
       
       return result;
