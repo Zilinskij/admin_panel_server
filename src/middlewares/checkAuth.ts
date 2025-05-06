@@ -9,7 +9,7 @@ export function checkAuth(req: Request, res: Response, next: NextFunction) {
       next();
     }
   } catch (error) {
-    console.log(error);
+    console.log(error, 'checkAuth error');
     res.status(401).json({ message: "Unauthorized" });
   }
 }

@@ -50,11 +50,10 @@ class AuthController {
   }
 
   async refreshToken(req: Request, res: Response) {
-    try {
- 
-      
+    try {     
       const refreshToken = req.cookies.refreshToken;
       const result = await authService.refreshSecretToken(refreshToken);
+      
       const { password_hash: newPassword, ...userWithoutPasword } = result?.user;
 
       res.cookie("refreshToken", result?.newRefreshToken, {
@@ -73,7 +72,7 @@ class AuthController {
         ...userWithoutPasword,
       });
     } catch (error) {
-      console.error();
+      console.error('auth controllers logout error', error);
       res.status(500).json({ error: "Щось не працює" });
     }
   }

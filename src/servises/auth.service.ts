@@ -116,15 +116,17 @@ class AuthService {
   async postRegisterUser(data: TAdminRegisterData) {
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const registerObject = {
-      password_hash: hashedPassword,
+      email: data?.email,
       name: data?.name,
       surname: data?.surname,
-      email: data?.email,
+      password_hash: hashedPassword,
     };
     const result = await trh.query("call adm_user_reestr($1,$2)", [
       registerObject,
       {},
     ]);
+    console.log(registerObject, "result registerObject for register");
+
     console.log(result.rows[0], "result for register");
     return result.rows[0];
   }
