@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import { routerState } from "./routerWrapper/routerState";
 import http from "http";
 import { Server } from "socket.io";
+import { useCompanySockets } from "./sockets/companySocket";
 
 const app = express();
 const server = http.createServer(app);
@@ -25,9 +26,7 @@ routerState(app);
 
 io.on("connection", (socket) => {
   console.log(`Користувач ${socket.id} підключився`);
-  socket.on("update", (e) => {
-    socket.emit("update1", e.email);
-  });
+  useCompanySockets(socket, io);
 
   socket.on("disconect", () => {
     console.log(`Користувач ${socket.id} відключився`);

@@ -5,6 +5,6 @@ export default router;
 
 router.post("/logout", authController.logoutUser);
 router.post("/login", authController.loginUser);
-router.get("/getme", authController.refreshToken);
+router.get("/getme", authController.getMe);
 router.post("/register", authController.postRegisterUs);
      

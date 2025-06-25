@@ -6,6 +6,7 @@ import { ApiRegister } from "../types/apiRegister";
 import { TAdminLoginData, TAdminRegisterData } from "../types/auth/auth.types";
 import trh from "../db/trh";
 import { error } from "console";
+
 interface DecodedToken extends jwt.JwtPayload {
   user_id: number; // або string, залежно від того, який тип у вас є
 }
@@ -13,65 +14,46 @@ let connection;
 class AuthService {
   async login(data: TAdminLoginData) {
     try {
-      const loginObject = {
-        email: data.email,
-      };
+      const checkUser = await trh.query(
+        `select * from admusr where email = $1`,
+        [data.email]
+      );
+      const user = checkUser.rows[0]
 
-      const first = await trh.query(`call adm_user_login($1,$2)`, [
-        loginObject,
-        {},
-      ]);
-
-      const firstCheck = first.rows[0].rs;
-      console.log(firstCheck);
-      if (firstCheck.status === "error") {
+      if (!user.id) {
         return {
-          firstCheck: {
-            error_message: firstCheck.error_message,
-          },
+          msg: "User with this email doesnt exist",
         };
       }
-      if (firstCheck.data.password_hash) {
-        const comparePassword = await bcrypt.compare(
-          data.password,
-          firstCheck.data.password_hash
-        );
 
-        if (comparePassword) {
-          const now = new Date();
-          const sevenDaysLater = new Date(
-            now.getTime() + 7 * 24 * 60 * 60 * 1000
-          );
-          const accessToken = jwt.sign(
-            { user_id: firstCheck.data.id },
-            `${process.env.JWT_ACCESS_SECRET!}`,
-            { expiresIn: "15m" }
-          );
+      const checkPassword = await bcrypt.compare(
+        data.password,
+        user.password_hash
+      );
 
-          // Генерація refresh токену
-          const refreshToken = jwt.sign(
-            { user_id: firstCheck.data.id },
-            `${process.env.JWT_REFRESH_SECRET!}`,
-            { expiresIn: "7d" }
-          );
+      console.log(checkPassword, "checkpassword");
+      if (!checkPassword) {
+        return {
+          msg: "Password is incorect",
+        };
+      }
 
-          const tokenSave = await trh.query(`call adm_user_token($1,$2)`, [
-            {
-              id_admuser: firstCheck.data.id,
-              refresh_token: refreshToken,
-              dt_lifetime: sevenDaysLater,
-            },
-            {},
-          ]);
 
-          console.log(tokenSave.rows[0]);
-
-          return {
-            firstCheck,
-            refreshToken,
-            accessToken,
-          };
-        }
+            const accessToken = jwt.sign(
+        { user_id: user.id },
+        process.env.JWT_ACCESS_SECRET!,
+        { expiresIn: "20m" }
+      );
+      const refreshToken = jwt.sign(
+        { user_id: user.id },
+        process.env.JWT_REFRESH_SECRET!,
+        { expiresIn: "10d" }
+      );
+    const { password_hash, ...userWithoutPassword } = user;
+      return {
+        user:userWithoutPassword,
+        accessToken,
+        refreshToken
       }
     } catch (error) {
       console.log(error);
@@ -87,7 +69,7 @@ class AuthService {
 
       const userData = await userService.getUserById(decoded?.user_id);
       const user = userData.rows[0];
-      console.log(user);
+   
 
       if (!user) {
         return { message: "Користувача не знайдено" };
@@ -125,6 +107,7 @@ class AuthService {
       registerObject,
       {},
     ]);
+
     console.log(registerObject, "result registerObject for register");
 
     console.log(result.rows[0], "result for register");
