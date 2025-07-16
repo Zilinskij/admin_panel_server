@@ -14,8 +14,6 @@ class UserService {
   async getAllUsers() {
     try {
       const result = await trh.query("SELECT * FROM admusr");
-      console.log(result);
-      
       return result;
     } catch (err) {
       throw new Error("Error fetching users");

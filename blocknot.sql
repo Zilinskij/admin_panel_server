@@ -18,3 +18,9 @@ select distinct tbl
    from transl
  ) t
 order by name
+
+// різне
+select id,
+       country_name
+from country
+order by country_name

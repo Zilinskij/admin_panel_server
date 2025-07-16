@@ -6,11 +6,11 @@ class TranslateService {
       const result = await trh.query(
         `select t.*, b.expr 
           from (select a.keystr, count(*) as kilperekl 
-          from transl a 
+          from translation a 
           where a.tbl = $1 
           group by a.keystr 
           order by keystr) t 
-          left join transl b on b.tbl = $1 
+          left join translation b on b.tbl = $1 
             and b.lang = 'uk' 
             and b.keystr = t.keystr`,
         [tbl]
@@ -24,9 +24,10 @@ class TranslateService {
 
   async allFields(value: string) {
     try {
-      const result = await trh.query("select * from transl where keystr = $1", [
-        value,
-      ]);
+      const result = await trh.query(
+        "select * from translation where keystr = $1",
+        [value]
+      );
       return result.rows[0];
     } catch (error) {
       console.error("DB error: ", error);
@@ -38,7 +39,7 @@ class TranslateService {
       const result = await trh.query(
         `select a.ids, b.expr 
               from v_langint a 
-                left join transl b on b.lang  = a.ids 
+                left join translation b on b.lang  = a.ids 
                 and b.tbl = $2 
                 and b.keystr = $1`,
         [key, tbl]
@@ -66,7 +67,10 @@ class TranslateService {
       const where = conditions.length
         ? `where ${conditions.join(" and ")}`
         : "";
-      const result = await trh.query(`select * from transl ${where}`, values);
+      const result = await trh.query(
+        `select * from translation ${where}`,
+        values
+      );
       return result.rows;
     } catch (error: any) {
       console.error("DB error:", error);
@@ -75,7 +79,7 @@ class TranslateService {
   }
 
   async tarasProcedura(procObj: {
-    id_admuser: { user_id: number };
+    id_admuser: number;
     tbl: string;
     fld: string;
     keystr: string;
@@ -84,11 +88,11 @@ class TranslateService {
     oper: number;
   }) {
     try {
-      const procString = JSON.stringify(procObj);
-      const result = await trh.query("call adm_transl_upd($1, $2)", [
-        procString,
-        {},
-      ]);
+      const procString = JSON.stringify({
+        ...procObj,
+        function_name: "adm_translation_modify",
+      });
+      const result = await trh.query("call adm_run($1, $2)", [procString, {}]);
       return result.rows[0].rs;
     } catch (error: any) {
       console.error("DB error:", error);
@@ -97,7 +101,7 @@ class TranslateService {
   }
 
   async translDelete(procObj: {
-    id_admuser: { user_id: number };
+    id_admuser: number;
     tbl: string;
     fld: string;
     keystr: string;
@@ -107,7 +111,7 @@ class TranslateService {
   }) {
     try {
       const procString = JSON.stringify(procObj);
-      const result = await trh.query("call adm_transl_upd($1, $2)", [
+      const result = await trh.query("call adm_translation_modify($1, $2)", [
         procString,
         {},
       ]);
@@ -132,7 +136,7 @@ class TranslateService {
                   when tbl = 'trailer_type' then 'Види причепів' 
                   when tbl = 'valut' then 'Валюти' 
                 end as name 
-         from (select distinct tbl from transl) t 
+         from (select distinct tbl from translation) t 
          order by name`
       );
       return result.rows;

@@ -10,17 +10,26 @@ class CompanyService {
     try {
       const offset = (page - 1) * limit;
       const result = await trh.query(
-        "select kod, NURDOKL, NURDOKLFIX, NUR, ADRPUNKT, ADRVUL, ISCLIENT, ISPOSTACH, PERMN, PERNEGABARIT, DIRECTOR from ur order by kod limit $1 offset $2",
+        `select a.id,
+                a.company_name,
+                a.dt_reestr ,
+                a.is_active,
+                a.edrpou,
+                a.lat,
+                a.lon,
+                a.locality,
+                b.idnt2 as country,
+                a.dt_blocked,
+                a.dt_deleted
+        from company a
+        left join country b on a.id_country = b.id
+        order by a.company_name 
+        limit $1 offset $2`,
         [limit, offset]
       );
-      const countResults = await trh.query("SELECT count(*) from ur");
+      const countResults = await trh.query("SELECT count(*) from company");
       const totalResults = parseInt(countResults.rows[0].count, 10);
       const totalPages = Math.ceil(totalResults / limit);
-
-      console.log("Кількість записів: ", totalResults);
-      console.log("Кількість сторінок ", totalPages);
-      console.log("Page -  ", page);
-
       return {
         data: result.rows,
         pagination: {
@@ -32,64 +41,7 @@ class CompanyService {
       };
     } catch (error) {
       console.error("DB error: ", error);
-
       throw new Error("Error fetching data company");
-    }
-  }
-
-  async getCompanyById(id: any) {
-    connection = await connectToPostDb();
-    try {
-      const result = await connection.query(`
-    SELECT * FROM danikompanij where id = ${id}`);
-
-      return result;
-    } catch (error) {
-      throw new Error("Error fetching data company");
-    }
-  }
-
-  async updateCompany({
-    kod,
-    nurdokl,
-    nurdoklfix,
-    nur,
-    adrpunkt,
-    adrvul,
-    director,
-    isclient,
-    ispostach,
-    iselse,
-    isexp,
-    permn,
-    pernegabarit,
-  }: ClientsIst) {
-    try {
-      const result = await trh.query(
-        "UPDATE ur SET nurdokl = $2, nurdoklfix = $3, nur = $4, adrpunkt = $5, adrvul = $6, director = $7, isclient = $8, ispostach = $9, iselse = $10, isexp = $11, permn = $12, pernegabarit = $13 WHERE kod = $1",
-        [
-          kod,
-          nurdokl,
-          nurdoklfix,
-          nur,
-          adrpunkt,
-          adrvul,
-          director,
-          isclient,
-          ispostach,
-          iselse,
-          isexp,
-          permn,
-          pernegabarit,
-        ]
-      );
-      // console.log(result);
-      
-      return result;
-    } catch (error) {
-      console.error(error, 'in services');
-      
-      throw new Error("Error update user");
     }
   }
 
@@ -97,10 +49,11 @@ class CompanyService {
     connection = await connectToPostDb();
     try {
       const result = await connection.query(
-        "SELECT * FROM danikompanij where imjakompanii = $1",
+        `SELECT * 
+        FROM danikompanij 
+        where imjakompanii = $1`,
         [name]
       );
-      console.log("Control -", result);
       return result;
     } catch (error) {
       console.error(error);
@@ -123,7 +76,18 @@ class CompanyService {
     connection = await connectToPostDb();
     try {
       const result = await connection.query(
-        "INSERT INTO danikompanij (imjakompanii, kodkompanii, dyrector, stvorena, nomertel, adresa, kilkprac, kilkprychepiv, kilkavto, strahfirm) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ",
+        `INSERT INTO danikompanij 
+                (imjakompanii, 
+                kodkompanii, 
+                dyrector, 
+                stvorena, 
+                nomertel, 
+                adresa, 
+                kilkprac, 
+                kilkprychepiv, 
+                kilkavto, 
+                strahfirm) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) `,
         [
           imjakompanii,
           kodkompanii,
@@ -139,7 +103,9 @@ class CompanyService {
       );
       if (result) {
         const row = await connection.query(
-          "SELECT * FROM danikompanij WHERE id = $1",
+          `SELECT * 
+          FROM danikompanij 
+          WHERE id = $1`,
           [result.insertId]
         );
         return row;
@@ -156,12 +122,45 @@ class CompanyService {
     const connection = await connectToPostDb();
     try {
       const result: any = await connection.execute(
-        "DELETE FROM danikompanij WHERE id = $1",
+        `DELETE FROM danikompanij 
+        WHERE id = $1`,
         [id]
       );
       return result;
     } catch (error) {
       throw new Error("Error fetching data company");
+    }
+  }
+
+  async createCompany(proc: {
+    id_admuser: number;
+    company_name: string;
+    id_country: number;
+    locality: string;
+    edrpou: string;
+  }) {
+    try {
+      const procString = JSON.stringify({...proc, function_name: "adm_company_reestr"});
+      const result = await trh.query("call adm_run($1, $2)", [
+        procString,
+        {},
+      ]);
+      return result.rows[0].rs;
+    } catch (error: any) {
+      console.error("DB error:", error);
+      throw new Error("Error filtered keys");
+    }
+  }
+
+  async companyForFields() {
+    try {
+      const result = await trh.query(
+        "select id, country_name from country order by country_name"
+      );
+      return result.rows
+    } catch (error) {
+      console.error("DB error:", error);
+      throw new Error("Error company for fields");
     }
   }
 }

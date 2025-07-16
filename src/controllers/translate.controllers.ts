@@ -48,7 +48,7 @@ class TranslateController {
   }
 
   async deleteValues(req: Request, res: Response) {
-    const { user_id, name } = getUserValues(req);
+    // const { user_id, name } = getUserValues(req);
     const { tbl, fld, keystr, lang, value, oper, ids, expr, id_admuser } =
       req.body;
     const procObj = {

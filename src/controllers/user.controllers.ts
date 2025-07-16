@@ -4,8 +4,6 @@ import { userService } from "../servises/user.services";
 class UserController {
   async getUsers(req:Request,res:Response) {
     const users = await userService.getAllUsers();
-    console.log(users.rows,'users in controller');
-    
     res.json(users.rows);
   }
 
